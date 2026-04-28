@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../widgets/chat_bubble.dart';
+import '../services/websocket_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -12,37 +13,44 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
 
-  // Mock data
-  final List<Message> _messages = [
-    Message(
-      id: '1',
-      senderId: 'Tom Nook',
-      content: 'Welcome to your new Island!',
-      type: 0,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-    Message(
-      id: '2',
-      senderId: 'me',
-      content: 'Thanks! How much do I owe you?',
-      type: 0,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
-    ),
-  ];
+  final WebSocketService _wsService = WebSocketService();
+
+  final List<Message> _messages = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _wsService.connect('ws://localhost:8080/ws');
+
+    _wsService.messageStream.listen((message) {
+      setState(() {
+        _messages.add(message);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _wsService.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
 
   void _handleSubmitted(String text) {
     if (text.trim().isEmpty) return;
 
     _textController.clear();
-    setState(() {
-      _messages.add(Message(
-        id: DateTime.now().toString(),
-        senderId: 'me',
-        content: text,
-        type: 0,
-        timestamp: DateTime.now(),
-      ));
-    });
+
+    final newMessage = Message(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      senderId: 'me',
+      content: text,
+      type: 0,
+      timestamp: DateTime.now(),
+    );
+
+    _wsService.sendMessage(newMessage);
   }
 
   @override
